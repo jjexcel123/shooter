@@ -3,29 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instant Offline 3D 1v1 Arena</title>
+    <title>Fixed 1v1 3D Offline Arena</title>
     <style>
         body { margin: 0; overflow: hidden; background: #060610; font-family: sans-serif; color: white; user-select: none; }
-        #hud { position: absolute; top: 15px; left: 15px; background: rgba(15,15,30,0.9); padding: 15px; border-radius: 6px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.4; font-size: 13px; }
-        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        #hud { position: absolute; top: 15px; left: 15px; background: rgba(15,15,30,0.9); padding: 15px; border-radius: 6px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.4; font-size: 13px; z-index: 10; }
+        #hotbar { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
         .slot { width: 75px; height: 60px; background: rgba(20,20,40,0.9); border: 2px solid #444; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #888; }
         .slot.active { border-color: #00f5d4; color: #fff; background: rgba(0,245,212,0.15); }
+        
+        /* Mobile/Mouse backup click controls layout */
+        #touch-controls { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 100; }
+        .btn { background: #1e1e38; border: 2px solid #00f5d4; color: white; padding: 12px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn:active { background: #00f5d4; color: black; }
     </style>
 </head>
 <body>
 
     <div id="hud">
-        <h3 style="margin:0 0 6px 0; color:#00f5d4;">Pure 3D Sandbox</h3>
+        <h3 style="margin:0 0 6px 0; color:#00f5d4;">Universal 3D Engine</h3>
         <b>[W, A, S, D]</b> Walk Around<br>
         <b>[Left / Right Arrow]</b> Spin Camera<br>
-        <b>[Up / Down Arrow]</b> Look Up / Down<br>
+        <b>[Up / Down Arrow]</b> Tilt View Angle<br>
         <b>[1]</b> Gun Mode &nbsp;|&nbsp; <b>[2]</b> Wall Mode<br>
-        <b>[SPACEBAR]</b> Shoot Bullet / Build Wall
+        <b>[SPACEBAR]</b> Fire Gun / Build Structure
     </div>
 
     <div id="hotbar">
         <div class="slot active" id="slot-1"><span>🔫</span><br>GUN (1)</div>
         <div class="slot" id="slot-2"><span>🧱</span><br>WALL (2)</div>
+    </div>
+
+    <!-- Backup Controls Box: Left-Clicking these works instantly if your keyboard focus drops out -->
+    <div id="touch-controls">
+        <button class="btn" onmousedown="keys['w']=true" onmouseup="keys['w']=false" onmouseleave="keys['w']=false">FORWARDS (W)</button>
+        <button class="btn" onmousedown="keys['arrowleft']=true" onmouseup="keys['arrowleft']=false" onmouseleave="keys['arrowleft']=false">TURN LEFT (←)</button>
+        <button class="btn" onmousedown="keys['arrowright']=true" onmouseup="keys['arrowright']=false" onmouseleave="keys['arrowright']=false">TURN RIGHT (→)</button>
+        <button class="btn" onclick="executeAction()">FIRE / BUILD (SPACE)</button>
     </div>
 
     <canvas id="renderCanvas"></canvas>
@@ -41,18 +54,16 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Game World Variables ---
+        // --- Core Application Engine Matrices ---
         let activeSlot = 1;
-        const keys = {};
+        const keys = { w: false, s: false, a: false, d: false, arrowleft: false, arrowright: false, arrowup: false, arrowdown: false };
         
-        // Coordinates and Camera matrix
         const player = { x: 0, y: 0, z: 10, yaw: 0, pitch: 0 };
         const bot = { x: 0, y: 0, z: -15, size: 1.5, color: "#ff4757", dir: 1 };
         
         const walls = [];
         const bullets = [];
         
-        // Standard geometric layouts for building block boxes
         function createCubeVertices(cx, cy, cz, sx, sy, sz) {
             const hx = sx/2, hy = sy/2, hz = sz/2;
             return [
@@ -64,18 +75,39 @@
         }
 
         const cubeFaces = [
-            [0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
-            [1, 5, 6, 2], [4, 5, 1, 0], [3, 2, 6, 7]
+            [0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4],
+            [2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5]
         ];
 
-        // --- Input Event Bindings ---
+        // --- Standardized Key String Parsing Pipeline ---
         window.addEventListener('keydown', (e) => {
-            keys[e.code] = true;
-            if (e.key === '1') { activeSlot = 1; updateSlots(); }
-            if (e.key === '2') { activeSlot = 2; updateSlots(); }
-            if (e.code === 'Space') executeAction();
+            const k = e.key.toLowerCase();
+            if (k === ' ' || e.code === 'Space') { executeAction(); return; }
+            if (k === '1') { activeSlot = 1; updateSlots(); return; }
+            if (k === '2') { activeSlot = 2; updateSlots(); return; }
+            
+            // Standard tracking mapping checks
+            if (k === 'w') keys['w'] = true;
+            if (k === 's') keys['s'] = true;
+            if (k === 'a') keys['a'] = true;
+            if (k === 'd') keys['d'] = true;
+            if (e.key === 'ArrowLeft') keys['arrowleft'] = true;
+            if (e.key === 'ArrowRight') keys['arrowright'] = true;
+            if (e.key === 'ArrowUp') keys['arrowup'] = true;
+            if (e.key === 'ArrowDown') keys['arrowdown'] = true;
         });
-        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keys['w'] = false;
+            if (k === 's') keys['s'] = false;
+            if (k === 'a') keys['a'] = false;
+            if (k === 'd') keys['d'] = false;
+            if (e.key === 'ArrowLeft') keys['arrowleft'] = false;
+            if (e.key === 'ArrowRight') keys['arrowright'] = false;
+            if (e.key === 'ArrowUp') keys['arrowup'] = false;
+            if (e.key === 'ArrowDown') keys['arrowdown'] = false;
+        });
 
         function updateSlots() {
             document.getElementById('slot-1').className = activeSlot === 1 ? 'slot active' : 'slot';
@@ -83,29 +115,25 @@
         }
 
         function executeAction() {
-            // Project vectors out from player alignment angles configurations
             const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
             if (activeSlot === 1) {
-                // Shoot Projectile 3D sphere point
+                // Spawn Projectile
                 bullets.push({
                     x: player.x, y: 0.5, z: player.z,
                     vx: -sY * 0.8, vy: Math.sin(player.pitch) * 0.8, vz: -cY * 0.8
                 });
             } else if (activeSlot === 2) {
-                // Snap structure block directly in front of face direction
+                // Snap Build Structure node
                 const bx = Math.round((player.x - sY * 5) / 4) * 4;
                 const bz = Math.round((player.z - cY * 5) / 4) * 4;
-                
-                // Block duplication prevent step
                 if (!walls.some(w => w.x === bx && w.z === bz)) {
                     walls.push({ x: bx, y: 0.5, z: bz, sx: 4, sy: 3, sz: 0.5 });
                 }
             }
         }
 
-        // --- Mathematics: Transform 3D Points into 2D Screen Spaces ---
+        // --- Graphics Engine Ray Matrices Perspective Transformation ---
         function project3DPoint(worldX, worldY, worldZ) {
-            // 1. Translate relative position coordinates to behind-player camera view tracking offsets
             const sY = Math.sin(-player.yaw), cY = Math.cos(-player.yaw);
             const camDistance = 6;
             const camHeight = 2.5;
@@ -118,19 +146,15 @@
             let dy = worldY - ry;
             let dz = worldZ - rz;
 
-            // 2. Compute Yaw Rotation Matrices configurations
             let x1 = dx * cY - dz * sY;
             let z1 = dx * sY + dz * cY;
 
-            // 3. Compute Pitch Rotation Matrices configurations
             const sP = Math.sin(-player.pitch), cP = Math.cos(-player.pitch);
             let y2 = dy * cP - z1 * sP;
             let z2 = dy * sP + z1 * cP;
 
-            // Don't render points sitting behind camera viewport boundaries plane
             if (z2 <= 0.1) return null;
 
-            // 4. Perspective Divide mapping values onto canvas scale ranges
             const fovFactor = (canvas.width + canvas.height) / 2;
             const screenX = (x1 / z2) * fovFactor + canvas.width / 2;
             const screenY = (-y2 / z2) * fovFactor + canvas.height / 2;
@@ -138,19 +162,16 @@
             return { x: screenX, y: screenY, depth: z2 };
         }
 
-        // Render solid geometric shapes with basic back-to-front depth sort layering
         function draw3DObject(vertices, color, outlineColor) {
             cubeFaces.forEach(face => {
                 ctx.beginPath();
                 let validFace = true;
-                
                 face.forEach((vIdx, i) => {
                     const pt = project3DPoint(vertices[vIdx].x, vertices[vIdx].y, vertices[vIdx].z);
                     if (!pt) { validFace = false; return; }
                     if (i === 0) ctx.moveTo(pt.x, pt.y);
                     else ctx.lineTo(pt.x, pt.y);
                 });
-
                 if (validFace) {
                     ctx.closePath();
                     ctx.fillStyle = color;
@@ -162,40 +183,33 @@
             });
         }
 
-        // --- Core Engine Processing Loop Loops ---
+        // --- Core State Logic Loops ---
         function frameUpdate() {
-            // Look controls via arrow keys mapping offsets configurations
-            if (keys['ArrowLeft']) player.yaw += 0.04;
-            if (keys['ArrowRight']) player.yaw -= 0.04;
-            if (keys['ArrowUp']) player.pitch = Math.min(0.5, player.pitch + 0.03);
-            if (keys['ArrowDown']) player.pitch = Math.max(-0.5, player.pitch - 0.03);
+            if (keys['arrowleft']) player.yaw += 0.04;
+            if (keys['arrowright']) player.yaw -= 0.04;
+            if (keys['arrowup']) player.pitch = Math.min(0.5, player.pitch + 0.03);
+            if (keys['arrowdown']) player.pitch = Math.max(-0.5, player.pitch - 0.03);
 
-            // Movement relative to facing direction
             const speed = 0.15;
             const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
-            if (keys['KeyW']) { player.x -= sin * speed; player.z -= cos * speed; }
-            if (keys['KeyS']) { player.x += sin * speed; player.z += cos * speed; }
-            if (keys['KeyA']) { player.x -= cos * speed; player.z += sin * speed; }
-            if (keys['KeyD']) { player.x += cos * speed; player.z -= sin * speed; }
+            if (keys['w']) { player.x -= sin * speed; player.z -= cos * speed; }
+            if (keys['s']) { player.x += sin * speed; player.z += cos * speed; }
+            if (keys['a']) { player.x -= cos * speed; player.z += sin * speed; }
+            if (keys['d']) { player.x += cos * speed; player.z -= sin * speed; }
 
-            // Bot movement ping-pong pattern
             bot.x += 0.06 * bot.dir;
-            if (Math.abs(bot.x) > 10) bot.dir *= -1;
+            if (Math.abs(bot.x) > 12) bot.dir *= -1;
 
-            // Projectiles mechanics path updates
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
                 b.x += b.vx; b.y += b.vy; b.z += b.vz;
-
-                // Simple collision test tracking vs enemy bot box matrix bounds
                 const d = Math.hypot(b.x - bot.x, b.z - bot.z);
                 if (d < bot.size && Math.abs(b.y - bot.y) < 1.5) {
-                    bot.color = "#00f5d4"; // Flash green on weapon impact registration
+                    bot.color = "#00f5d4";
                     setTimeout(() => bot.color = "#ff4757", 150);
                     bullets.splice(i, 1);
                     continue;
                 }
-                // Out of range wipe cleanup cycle 
                 if (Math.hypot(b.x - player.x, b.z - player.z) > 100) bullets.splice(i, 1);
             }
         }
@@ -204,12 +218,11 @@
             ctx.fillStyle = "#0c0c1e";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw 3D Arena Floor Grid Matrix Accent System
+            // Floor rendering parameters
             ctx.strokeStyle = "#1b1b3a";
             ctx.lineWidth = 1;
             const gridSize = 40, spacing = 4;
             for (let i = -gridSize; i <= gridSize; i += spacing) {
-                // Cross directional infinite alignment projection mappings lines
                 ctx.beginPath();
                 for (let z = -gridSize; z <= gridSize; z += 2) {
                     const pt = project3DPoint(i, -1, z);
@@ -225,26 +238,17 @@
                 ctx.stroke();
             }
 
-            // 2. Draw Target Bot Box Structure
-            const botVerts = createCubeVertices(bot.x, 0.5, bot.z, bot.size, 2, bot.size);
-            draw3DObject(botVerts, bot.color, "#ffffff");
+            // Draw Entities
+            draw3DObject(createCubeVertices(bot.x, 0.5, bot.z, bot.size, 2, bot.size), bot.color, "#ffffff");
+            walls.forEach(w => draw3DObject(createCubeVertices(w.x, w.y, w.z, w.sx, w.sy, w.sz), "#2a3dac", "#4d62e0"));
 
-            // 3. Draw User Placed Architecture Modular Walls Setup
-            walls.forEach(w => {
-                const wallVerts = createCubeVertices(w.x, w.y, w.z, w.sx, w.sy, w.sz);
-                draw3DObject(wallVerts, "#2a3dac", "#4d62e0");
-            });
-
-            // 4. Draw Blueprint Placement Outline if in Build Mode
             if (activeSlot === 2) {
                 const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
                 const bx = Math.round((player.x - sY * 5) / 4) * 4;
                 const bz = Math.round((player.z - cY * 5) / 4) * 4;
-                const ghostVerts = createCubeVertices(bx, 0.5, bz, 4, 3, 0.5);
-                draw3DObject(ghostVerts, "rgba(0, 245, 212, 0.1)", "#00f5d4");
+                draw3DObject(createCubeVertices(bx, 0.5, bz, 4, 3, 0.5), "rgba(0, 245, 212, 0.1)", "#00f5d4");
             }
 
-            // 5. Render Flying Projectiles Particles Dots
             bullets.forEach(b => {
                 const pt = project3DPoint(b.x, b.y, b.z);
                 if (pt) {
@@ -252,11 +256,10 @@
                     ctx.arc(pt.x, pt.y, Math.max(2, 10 / pt.depth), 0, Math.PI * 2);
                     ctx.fillStyle = "#00f5d4";
                     ctx.fill();
-                    ctx.closePath();
                 }
             });
 
-            // 6. Center Pointer Reticle Overlay configuration target
+            // Reticle Frame Highlight Target
             ctx.strokeStyle = "#00f5d4";
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -270,7 +273,6 @@
             requestAnimationFrame(engineLoop);
         }
 
-        // Kick off engine loops natively without blocking layers hooks
         engineLoop();
     </script>
 </body>
