@@ -3,349 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1v1 Build Shooter 2D Sandbox</title>
+    <title>Immediate 1v1 3D Sandbox</title>
     <style>
-        body {
-            margin: 0;
-            background-color: #0b0b16;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            user-select: none;
-        }
-        #hud {
-            display: flex;
-            justify-content: space-between;
-            width: 900px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            background: rgba(25, 25, 35, 0.8);
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: 2px solid #3f3f5a;
-            box-sizing: border-box;
-        }
-        canvas {
-            background-color: #161624;
-            border: 4px solid #3f3f5a;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-            cursor: crosshair;
-        }
-        .bar-bg {
-            background: #222;
-            width: 150px;
-            height: 14px;
-            border-radius: 4px;
-            display: inline-block;
-            overflow: hidden;
-            border: 1px solid #444;
-            vertical-align: middle;
-        }
-        .bar-fill {
-            height: 100%;
-            width: 100%;
-            transition: width 0.1s ease;
-        }
-        #hp-fill { background: #ff4757; }
-        #mode-indicator { color: #00ffff; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #050510; }
+        #hud { position: absolute; top: 10px; left: 10px; color: white; background: rgba(10,10,25,0.85); padding: 15px; border-radius: 6px; border: 1px solid #00ffff; pointer-events: none; z-index: 10; }
+        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
+        .slot { width: 80px; height: 65px; background: rgba(20,20,40,0.9); border: 2px solid #444; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 11px; font-weight: bold; }
+        .slot.active { border-color: #00ffff; color: #fff; background: rgba(0,255,255,0.2); }
     </style>
+    <!-- Load Three.js Core Engine -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
     <div id="hud">
-        <div>
-            HEALTH: <div class="bar-bg"><div id="hp-fill" class="bar-fill"></div></div>
-        </div>
-        <div>
-            MODE: <span id="mode-indicator">🔫 WEAPON (Press E to Toggle)</span>
-        </div>
-        <div>
-            SCORE: <span id="score">0</span>
-        </div>
+        <h3 style="margin:0 0 8px 0; color:#00ffff;">3D Arena Sandbox</h3>
+        <b>[WASD]</b> Move Player<br>
+        <b>[Left/Right Arrow]</b> Turn Camera<br>
+        <b>[Up/Down Arrow]</b> Aim Up/Down<br>
+        <b>[1]</b> Gun Mode &nbsp;|&nbsp; <b>[2]</b> Wall Mode<br>
+        <b>[SPACE]</b> Shoot Bullet / Place Wall
     </div>
 
-    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="hotbar">
+        <div class="slot active" id="slot-1"><span>🔫</span><br>GUN (1)</div>
+        <div class="slot" id="slot-2"><span>🧱</span><br>WALL (2)</div>
+    </div>
 
     <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+        // 1. Scene Engine Setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
 
-        // Game State Variables
-        let keys = {};
-        let mouse = { x: 0, y: 0 };
-        let currentMode = "gun"; // "gun" or "build"
-        let playerScore = 0;
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        // Entities arrays
+        // 2. Lighting & Floor Grid
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+        sun.position.set(10, 30, 10);
+        scene.add(sun);
+
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x111424 }));
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(200, 50, 0x00ffff, 0x222538);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        // 3. Player Setup (Bright Cyan Capsule Box)
+        const player = new THREE.Group();
+        scene.add(player);
+        player.position.set(0, 0, 10);
+
+        const pMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 1.2), new THREE.MeshStandardMaterial({ color: 0x00d2d3 }));
+        pMesh.position.y = 1;
+        player.add(pMesh);
+
+        // 4. Enemy Bot Setup (Red Capsule Box)
+        const bot = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 1.2), new THREE.MeshStandardMaterial({ color: 0xff4757 }));
+        bot.position.set(0, 1, -15);
+        scene.add(bot);
+
+        // 5. Input System State
+        const keys = {};
+        let yaw = 0;   // Left/Right rotation
+        let pitch = 0; // Up/Down tracking
+        let activeSlot = 1; 
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.key === '1') switchSlot(1);
+            if (e.key === '2') switchSlot(2);
+            
+            // Fire trigger mapped safely to Spacebar
+            if (e.code === 'Space') {
+                executeAction();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        function switchSlot(num) {
+            activeSlot = num;
+            document.getElementById('slot-1').className = num === 1 ? 'slot active' : 'slot';
+            document.getElementById('slot-2').className = num === 2 ? 'slot active' : 'slot';
+        }
+
+        // 6. Projectiles and Structure Containers
         const bullets = [];
-        const structures = [];
+        const ghostWall = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }));
+        scene.add(ghostWall);
 
-        // Player setup
-        const player = {
-            x: 150,
-            y: 300,
-            radius: 18,
-            speed: 4.5,
-            hp: 100,
-            angle: 0
-        };
-
-        // Aggressive Enemy AI setup
-        const bot = {
-            x: 750,
-            y: 300,
-            radius: 18,
-            speed: 2.8,
-            hp: 100,
-            angle: 0,
-            lastShot: 0,
-            shootInterval: 700
-        };
-
-        // --- Event Inputs ---
-        window.addEventListener("keydown", (e) => {
-            keys[e.key.toLowerCase()] = true;
-            
-            // Fast action item toggles
-            if (e.key.toLowerCase() === 'e') {
-                currentMode = (currentMode === "gun") ? "build" : "gun";
-                document.getElementById("mode-indicator").innerText = 
-                    currentMode === "gun" ? "🔫 WEAPON (Press E to Toggle)" : "🧱 WALL BUILD (Press E to Toggle)";
-            }
-        });
-        
-        window.addEventListener("keyup", (e) => {
-            keys[e.key.toLowerCase()] = false;
-        });
-        
-        canvas.addEventListener("mousemove", (e) => {
-            const rect = canvas.getBoundingClientRect();
-            mouse.x = e.clientX - rect.left;
-            mouse.y = e.clientY - rect.top;
-        });
-
-        canvas.addEventListener("mousedown", (e) => {
-            if (player.hp <= 0) return;
-
-            if (currentMode === "gun") {
-                // Fire bullet towards mouse coordinates
-                const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-                bullets.push({
-                    x: player.x + Math.cos(angle) * player.radius,
-                    y: player.y + Math.sin(angle) * player.radius,
-                    vx: Math.cos(angle) * 9,
-                    vy: Math.sin(angle) * 9,
-                    owner: "player"
-                });
-            } else {
-                // Modular Grid Snapping build positioning placement
-                const snapGridX = Math.floor(mouse.x / 40) * 40;
-                const snapGridY = Math.floor(mouse.y / 40) * 40;
+        function executeAction() {
+            if (activeSlot === 1) {
+                // Fire Bullets Directly Forward
+                const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
+                b.position.copy(player.position).y += 1.3;
                 
-                // Block placing logic if cell is completely clear
-                const exists = structures.some(s => s.x === snapGridX && s.y === snapGridY);
-                if (!exists) {
-                    structures.push({ x: snapGridX, y: snapGridY, size: 40 });
-                }
+                // Project direction vector from internal camera matrices
+                const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                b.velocity = dir.multiplyScalar(1.2);
+                scene.add(b);
+                bullets.push(b);
+            } else if (activeSlot === 2) {
+                // Build Solid Structure Node
+                const w = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), new THREE.MeshStandardMaterial({ color: 0x3f51b5 }));
+                w.position.copy(ghostWall.position);
+                w.rotation.copy(ghostWall.rotation);
+                scene.add(w);
             }
-        });
+        }
 
-        // --- Core Loops Engine ---
-        function update() {
-            if (player.hp <= 0) return;
+        // 7. Engine Game Loop Execution
+        function animate() {
+            requestAnimationFrame(animate);
 
-            // Player position offsets inputs updates
-            let nextX = player.x;
-            let nextY = player.y;
-
-            if (keys["w"]) nextY -= player.speed;
-            if (keys["s"]) nextY += player.speed;
-            if (keys["a"]) nextX -= player.speed;
-            if (keys["d"]) nextX += player.speed;
-
-            // Simple boundary map wall checks
-            if (nextX > player.radius && nextX < canvas.width - player.radius) player.x = nextX;
-            if (nextY > player.radius && nextY < canvas.height - player.radius) player.y = nextY;
-
-            // Track continuous mouse rotations angles configurations
-            player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-
-            // --- Aggressive Threat Tracking Bot AI logic updates ---
-            bot.angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+            // Turn player/camera using Left and Right arrow keys
+            if (keys['ArrowLeft']) yaw += 0.04;
+            if (keys['ArrowRight']) yaw -= 0.04;
             
-            // Path tracking mechanics targeting the user
-            const distanceToPlayer = Math.hypot(player.x - bot.x, player.y - bot.y);
-            if (distanceToPlayer > 180) {
-                bot.x += Math.cos(bot.angle) * bot.speed;
-                bot.y += Math.sin(bot.angle) * bot.speed;
-            } else if (distanceToPlayer < 100) {
-                bot.x -= Math.cos(bot.angle) * bot.speed;
-                bot.y -= Math.sin(bot.angle) * bot.speed;
+            // Look up/down using Up and Down arrow keys
+            if (keys['ArrowUp']) pitch = Math.min(0.6, pitch + 0.03);
+            if (keys['ArrowDown']) pitch = Math.max(-0.6, pitch - 0.03);
+
+            player.rotation.y = yaw;
+
+            // Move player relative to facing direction
+            const speed = 0.15;
+            if (keys['KeyW']) { player.position.x -= Math.sin(yaw) * speed; player.position.z -= Math.cos(yaw) * speed; }
+            if (keys['KeyS']) { player.position.x += Math.sin(yaw) * speed; player.position.z += Math.cos(yaw) * speed; }
+            if (keys['KeyA']) { player.position.x -= Math.cos(yaw) * speed; player.position.z += Math.sin(yaw) * speed; }
+            if (keys['KeyD']) { player.position.x += Math.cos(yaw) * speed; player.position.z -= Math.cos(yaw) * speed; }
+
+            // Behind-the-shoulder camera positioning matrix
+            const camOffset = new THREE.Vector3(0, 2.5, 5.5).applyQuaternion(player.quaternion);
+            camera.position.copy(player.position).add(camOffset);
+
+            // Compute focus target coordinates ahead of player
+            const lookTarget = new THREE.Vector3(0, 1.3, -15).applyQuaternion(player.quaternion).add(player.position);
+            lookTarget.y += pitch * 10;
+            camera.lookAt(lookTarget);
+
+            // Dynamic grid wall blueprint builder snappings
+            if (activeSlot === 2) {
+                ghostWall.visible = true;
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion);
+                const buildPoint = new THREE.Vector3().copy(player.position).addScaledVector(forward, 6);
+                
+                const snapX = Math.round(buildPoint.x / 4) * 4;
+                const snapZ = Math.round(buildPoint.z / 4) * 4;
+                ghostWall.position.set(snapX, 1.5, snapZ);
+                ghostWall.rotation.y = Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
+            } else {
+                ghostWall.visible = false;
             }
 
-            // Continuous bot auto weaponry fire schedules
-            const now = Date.now();
-            if (now - bot.lastShot > bot.shootInterval && bot.hp > 0) {
-                bullets.push({
-                    x: bot.x + Math.cos(bot.angle) * bot.radius,
-                    y: bot.y + Math.sin(bot.angle) * bot.radius,
-                    vx: Math.cos(bot.angle) * 6.5,
-                    vy: Math.sin(bot.angle) * 6.5,
-                    owner: "bot"
-                });
-                bot.lastShot = now;
-            }
-
-            // --- Projectiles Operations and Damage Mapping ---
+            // Update weapon projectile trajectories
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
-                b.x += b.vx;
-                b.y += b.vy;
-
-                // Border bounds wipe checks
-                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                b.position.add(b.velocity);
+                
+                // Simple hit detection tracking vs the red target bot
+                if (b.position.distanceTo(bot.position) < 1.5) {
+                    bot.material.color.setHex(Math.random() * 0xffffff); // Bot flashes random color when hit
+                    scene.remove(b);
                     bullets.splice(i, 1);
                     continue;
                 }
-
-                // Check impacts targets vs built defensive blocks structures
-                let hitStructure = false;
-                for (let j = structures.length - 1; j >= 0; j--) {
-                    let s = structures[j];
-                    if (b.x > s.x && b.x < s.x + s.size && b.y > s.y && b.y < s.y + s.size) {
-                        structures.splice(j, 1); // Break structural box block down
-                        hitStructure = true;
-                        break;
-                    }
-                }
-                if (hitStructure) {
+                
+                // Cleanup out of bounds projectiles
+                if (b.position.length() > 150) {
+                    scene.remove(b);
                     bullets.splice(i, 1);
-                    continue;
-                }
-
-                // Entity targeted hits calculations
-                if (b.owner === "bot") {
-                    if (Math.hypot(b.x - player.x, b.y - player.y) < player.radius) {
-                        player.hp -= 20;
-                        document.getElementById("hp-fill").style.width = `${Math.max(0, player.hp)}%`;
-                        bullets.splice(i, 1);
-                        continue;
-                    }
-                } else if (b.owner === "player") {
-                    if (Math.hypot(b.x - bot.x, b.y - bot.y) < bot.radius) {
-                        bot.hp -= 25;
-                        bullets.splice(i, 1);
-                        
-                        if (bot.hp <= 0) {
-                            playerScore++;
-                            document.getElementById("score").innerText = playerScore;
-                            // Instant layout respawn updates routines 
-                            bot.x = Math.random() * 400 + 450;
-                            bot.y = Math.random() * 400 + 100;
-                            bot.hp = 100;
-                        }
-                        continue;
-                    }
                 }
             }
+
+            renderer.render(scene, camera);
         }
 
-        // --- Graphics Render Output Methods ---
-        function drawEntity(x, y, radius, angle, coreColor) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(angle);
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-            // Weapon barrel asset extensions
-            ctx.fillStyle = "#555a70";
-            ctx.fillRect(0, -5, 28, 10);
-
-            // Unit circular meshes body structures
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.fillStyle = coreColor;
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = "#ffffff";
-            ctx.stroke();
-            ctx.closePath();
-
-            ctx.restore();
-        }
-
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Background Arena Grid Accent Highlights Visuals lines
-            ctx.strokeStyle = "#1f1f33";
-            ctx.lineWidth = 1;
-            for (let i = 0; i < canvas.width; i += 40) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-            }
-            for (let j = 0; j < canvas.height; j += 40) {
-                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
-            }
-
-            // Draw active user structures modular walls map positions
-            structures.forEach(s => {
-                ctx.fillStyle = "#4b7bec";
-                ctx.fillRect(s.x + 2, s.y + 2, s.size - 4, s.size - 4);
-                ctx.strokeStyle = "#3867d6";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(s.x + 2, s.y + 2, s.size - 4, s.size - 4);
-            });
-
-            // Draw real-time blueprint placement ghost box if building mode is enabled
-            if (currentMode === "build") {
-                const ghostX = Math.floor(mouse.x / 40) * 40;
-                const ghostY = Math.floor(mouse.y / 40) * 40;
-                ctx.fillStyle = "rgba(0, 255, 255, 0.25)";
-                ctx.fillRect(ghostX + 2, ghostY + 2, 36, 36);
-                ctx.strokeStyle = "#00ffff";
-                ctx.strokeRect(ghostX + 2, ghostY + 2, 36, 36);
-            }
-
-            // Draw Player and Threat Bot models shapes
-            if (player.hp > 0) drawEntity(player.x, player.y, player.radius, player.angle, "#00d2d3");
-            if (bot.hp > 0) drawEntity(bot.x, bot.y, bot.radius, bot.angle, "#ff4757");
-
-            // Render live fire traveling projectiles points loops 
-            bullets.forEach(b => {
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = b.owner === "player" ? "#00ffff" : "#xff4757";
-                ctx.fill();
-                ctx.closePath();
-            });
-
-            // Handle Defeat Game Over overlays masks panels updates
-            if (player.hp <= 0) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.font = "bold 40px sans-serif";
-                ctx.fillStyle = "#ff4757";
-                ctx.textAlign = "center";
-                ctx.fillText("GAME OVER - BOT ELIMINATED YOU", canvas.width / 2, canvas.height / 2);
-                ctx.font = "20px sans-serif";
-                ctx.fillStyle = "#ffffff";
-                ctx.fillText("Refresh browser page tab to reload sandbox instantly", canvas.width / 2, canvas.height / 2 + 40);
-            }
-        }
-
-        function gameLoop() {
-            update();
-            render();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Start the engine loop directly, skipping lock security blockers entirely
-        gameLoop();
+        animate();
     </script>
 </body>
 </html>
