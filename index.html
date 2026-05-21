@@ -3,26 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Immediate 1v1 3D Sandbox</title>
+    <title>Instant Offline 3D 1v1 Arena</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #050510; }
-        #hud { position: absolute; top: 10px; left: 10px; color: white; background: rgba(10,10,25,0.85); padding: 15px; border-radius: 6px; border: 1px solid #00ffff; pointer-events: none; z-index: 10; }
-        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
-        .slot { width: 80px; height: 65px; background: rgba(20,20,40,0.9); border: 2px solid #444; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 11px; font-weight: bold; }
-        .slot.active { border-color: #00ffff; color: #fff; background: rgba(0,255,255,0.2); }
+        body { margin: 0; overflow: hidden; background: #060610; font-family: sans-serif; color: white; user-select: none; }
+        #hud { position: absolute; top: 15px; left: 15px; background: rgba(15,15,30,0.9); padding: 15px; border-radius: 6px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.4; font-size: 13px; }
+        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .slot { width: 75px; height: 60px; background: rgba(20,20,40,0.9); border: 2px solid #444; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #888; }
+        .slot.active { border-color: #00f5d4; color: #fff; background: rgba(0,245,212,0.15); }
     </style>
-    <!-- Load Three.js Core Engine -->
-    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
     <div id="hud">
-        <h3 style="margin:0 0 8px 0; color:#00ffff;">3D Arena Sandbox</h3>
-        <b>[WASD]</b> Move Player<br>
-        <b>[Left/Right Arrow]</b> Turn Camera<br>
-        <b>[Up/Down Arrow]</b> Aim Up/Down<br>
+        <h3 style="margin:0 0 6px 0; color:#00f5d4;">Pure 3D Sandbox</h3>
+        <b>[W, A, S, D]</b> Walk Around<br>
+        <b>[Left / Right Arrow]</b> Spin Camera<br>
+        <b>[Up / Down Arrow]</b> Look Up / Down<br>
         <b>[1]</b> Gun Mode &nbsp;|&nbsp; <b>[2]</b> Wall Mode<br>
-        <b>[SPACE]</b> Shoot Bullet / Place Wall
+        <b>[SPACEBAR]</b> Shoot Bullet / Build Wall
     </div>
 
     <div id="hotbar">
@@ -30,169 +28,250 @@
         <div class="slot" id="slot-2"><span>🧱</span><br>WALL (2)</div>
     </div>
 
+    <canvas id="renderCanvas"></canvas>
+
     <script>
-        // 1. Scene Engine Setup
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a1a);
+        const canvas = document.getElementById("renderCanvas");
+        const ctx = canvas.getContext("2d");
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-        // 2. Lighting & Floor Grid
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.5);
-        sun.position.set(10, 30, 10);
-        scene.add(sun);
-
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x111424 }));
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
-
-        const grid = new THREE.GridHelper(200, 50, 0x00ffff, 0x222538);
-        grid.position.y = 0.01;
-        scene.add(grid);
-
-        // 3. Player Setup (Bright Cyan Capsule Box)
-        const player = new THREE.Group();
-        scene.add(player);
-        player.position.set(0, 0, 10);
-
-        const pMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 1.2), new THREE.MeshStandardMaterial({ color: 0x00d2d3 }));
-        pMesh.position.y = 1;
-        player.add(pMesh);
-
-        // 4. Enemy Bot Setup (Red Capsule Box)
-        const bot = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 1.2), new THREE.MeshStandardMaterial({ color: 0xff4757 }));
-        bot.position.set(0, 1, -15);
-        scene.add(bot);
-
-        // 5. Input System State
+        // --- Game World Variables ---
+        let activeSlot = 1;
         const keys = {};
-        let yaw = 0;   // Left/Right rotation
-        let pitch = 0; // Up/Down tracking
-        let activeSlot = 1; 
+        
+        // Coordinates and Camera matrix
+        const player = { x: 0, y: 0, z: 10, yaw: 0, pitch: 0 };
+        const bot = { x: 0, y: 0, z: -15, size: 1.5, color: "#ff4757", dir: 1 };
+        
+        const walls = [];
+        const bullets = [];
+        
+        // Standard geometric layouts for building block boxes
+        function createCubeVertices(cx, cy, cz, sx, sy, sz) {
+            const hx = sx/2, hy = sy/2, hz = sz/2;
+            return [
+                {x: cx-hx, y: cy-hy, z: cz-hz}, {x: cx+hx, y: cy-hy, z: cz-hz},
+                {x: cx+hx, y: cy+hy, z: cz-hz}, {x: cx-hx, y: cy+hy, z: cz-hz},
+                {x: cx-hx, y: cy-hy, z: cz+hz}, {x: cx+hx, y: cy-hy, z: cz+hz},
+                {x: cx+hx, y: cy+hy, z: cz+hz}, {x: cx-hx, y: cy+hy, z: cz+hz}
+            ];
+        }
 
+        const cubeFaces = [
+            [0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
+            [1, 5, 6, 2], [4, 5, 1, 0], [3, 2, 6, 7]
+        ];
+
+        // --- Input Event Bindings ---
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if (e.key === '1') switchSlot(1);
-            if (e.key === '2') switchSlot(2);
-            
-            // Fire trigger mapped safely to Spacebar
-            if (e.code === 'Space') {
-                executeAction();
-            }
+            if (e.key === '1') { activeSlot = 1; updateSlots(); }
+            if (e.key === '2') { activeSlot = 2; updateSlots(); }
+            if (e.code === 'Space') executeAction();
         });
-        window.addEventListener('keyup', (e) => {
-            keys[e.code] = false;
-        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
-        function switchSlot(num) {
-            activeSlot = num;
-            document.getElementById('slot-1').className = num === 1 ? 'slot active' : 'slot';
-            document.getElementById('slot-2').className = num === 2 ? 'slot active' : 'slot';
+        function updateSlots() {
+            document.getElementById('slot-1').className = activeSlot === 1 ? 'slot active' : 'slot';
+            document.getElementById('slot-2').className = activeSlot === 2 ? 'slot active' : 'slot';
         }
-
-        // 6. Projectiles and Structure Containers
-        const bullets = [];
-        const ghostWall = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true }));
-        scene.add(ghostWall);
 
         function executeAction() {
+            // Project vectors out from player alignment angles configurations
+            const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
             if (activeSlot === 1) {
-                // Fire Bullets Directly Forward
-                const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-                b.position.copy(player.position).y += 1.3;
-                
-                // Project direction vector from internal camera matrices
-                const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                b.velocity = dir.multiplyScalar(1.2);
-                scene.add(b);
-                bullets.push(b);
+                // Shoot Projectile 3D sphere point
+                bullets.push({
+                    x: player.x, y: 0.5, z: player.z,
+                    vx: -sY * 0.8, vy: Math.sin(player.pitch) * 0.8, vz: -cY * 0.8
+                });
             } else if (activeSlot === 2) {
-                // Build Solid Structure Node
-                const w = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), new THREE.MeshStandardMaterial({ color: 0x3f51b5 }));
-                w.position.copy(ghostWall.position);
-                w.rotation.copy(ghostWall.rotation);
-                scene.add(w);
+                // Snap structure block directly in front of face direction
+                const bx = Math.round((player.x - sY * 5) / 4) * 4;
+                const bz = Math.round((player.z - cY * 5) / 4) * 4;
+                
+                // Block duplication prevent step
+                if (!walls.some(w => w.x === bx && w.z === bz)) {
+                    walls.push({ x: bx, y: 0.5, z: bz, sx: 4, sy: 3, sz: 0.5 });
+                }
             }
         }
 
-        // 7. Engine Game Loop Execution
-        function animate() {
-            requestAnimationFrame(animate);
+        // --- Mathematics: Transform 3D Points into 2D Screen Spaces ---
+        function project3DPoint(worldX, worldY, worldZ) {
+            // 1. Translate relative position coordinates to behind-player camera view tracking offsets
+            const sY = Math.sin(-player.yaw), cY = Math.cos(-player.yaw);
+            const camDistance = 6;
+            const camHeight = 2.5;
 
-            // Turn player/camera using Left and Right arrow keys
-            if (keys['ArrowLeft']) yaw += 0.04;
-            if (keys['ArrowRight']) yaw -= 0.04;
-            
-            // Look up/down using Up and Down arrow keys
-            if (keys['ArrowUp']) pitch = Math.min(0.6, pitch + 0.03);
-            if (keys['ArrowDown']) pitch = Math.max(-0.6, pitch - 0.03);
+            let rx = player.x - sY * camDistance;
+            let rz = player.z + cY * camDistance;
+            let ry = player.y + camHeight;
 
-            player.rotation.y = yaw;
+            let dx = worldX - rx;
+            let dy = worldY - ry;
+            let dz = worldZ - rz;
 
-            // Move player relative to facing direction
-            const speed = 0.15;
-            if (keys['KeyW']) { player.position.x -= Math.sin(yaw) * speed; player.position.z -= Math.cos(yaw) * speed; }
-            if (keys['KeyS']) { player.position.x += Math.sin(yaw) * speed; player.position.z += Math.cos(yaw) * speed; }
-            if (keys['KeyA']) { player.position.x -= Math.cos(yaw) * speed; player.position.z += Math.sin(yaw) * speed; }
-            if (keys['KeyD']) { player.position.x += Math.cos(yaw) * speed; player.position.z -= Math.cos(yaw) * speed; }
+            // 2. Compute Yaw Rotation Matrices configurations
+            let x1 = dx * cY - dz * sY;
+            let z1 = dx * sY + dz * cY;
 
-            // Behind-the-shoulder camera positioning matrix
-            const camOffset = new THREE.Vector3(0, 2.5, 5.5).applyQuaternion(player.quaternion);
-            camera.position.copy(player.position).add(camOffset);
+            // 3. Compute Pitch Rotation Matrices configurations
+            const sP = Math.sin(-player.pitch), cP = Math.cos(-player.pitch);
+            let y2 = dy * cP - z1 * sP;
+            let z2 = dy * sP + z1 * cP;
 
-            // Compute focus target coordinates ahead of player
-            const lookTarget = new THREE.Vector3(0, 1.3, -15).applyQuaternion(player.quaternion).add(player.position);
-            lookTarget.y += pitch * 10;
-            camera.lookAt(lookTarget);
+            // Don't render points sitting behind camera viewport boundaries plane
+            if (z2 <= 0.1) return null;
 
-            // Dynamic grid wall blueprint builder snappings
-            if (activeSlot === 2) {
-                ghostWall.visible = true;
-                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion);
-                const buildPoint = new THREE.Vector3().copy(player.position).addScaledVector(forward, 6);
+            // 4. Perspective Divide mapping values onto canvas scale ranges
+            const fovFactor = (canvas.width + canvas.height) / 2;
+            const screenX = (x1 / z2) * fovFactor + canvas.width / 2;
+            const screenY = (-y2 / z2) * fovFactor + canvas.height / 2;
+
+            return { x: screenX, y: screenY, depth: z2 };
+        }
+
+        // Render solid geometric shapes with basic back-to-front depth sort layering
+        function draw3DObject(vertices, color, outlineColor) {
+            cubeFaces.forEach(face => {
+                ctx.beginPath();
+                let validFace = true;
                 
-                const snapX = Math.round(buildPoint.x / 4) * 4;
-                const snapZ = Math.round(buildPoint.z / 4) * 4;
-                ghostWall.position.set(snapX, 1.5, snapZ);
-                ghostWall.rotation.y = Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
-            } else {
-                ghostWall.visible = false;
-            }
+                face.forEach((vIdx, i) => {
+                    const pt = project3DPoint(vertices[vIdx].x, vertices[vIdx].y, vertices[vIdx].z);
+                    if (!pt) { validFace = false; return; }
+                    if (i === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                });
 
-            // Update weapon projectile trajectories
+                if (validFace) {
+                    ctx.closePath();
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = outlineColor || "rgba(255,255,255,0.2)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // --- Core Engine Processing Loop Loops ---
+        function frameUpdate() {
+            // Look controls via arrow keys mapping offsets configurations
+            if (keys['ArrowLeft']) player.yaw += 0.04;
+            if (keys['ArrowRight']) player.yaw -= 0.04;
+            if (keys['ArrowUp']) player.pitch = Math.min(0.5, player.pitch + 0.03);
+            if (keys['ArrowDown']) player.pitch = Math.max(-0.5, player.pitch - 0.03);
+
+            // Movement relative to facing direction
+            const speed = 0.15;
+            const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+            if (keys['KeyW']) { player.x -= sin * speed; player.z -= cos * speed; }
+            if (keys['KeyS']) { player.x += sin * speed; player.z += cos * speed; }
+            if (keys['KeyA']) { player.x -= cos * speed; player.z += sin * speed; }
+            if (keys['KeyD']) { player.x += cos * speed; player.z -= sin * speed; }
+
+            // Bot movement ping-pong pattern
+            bot.x += 0.06 * bot.dir;
+            if (Math.abs(bot.x) > 10) bot.dir *= -1;
+
+            // Projectiles mechanics path updates
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
-                b.position.add(b.velocity);
-                
-                // Simple hit detection tracking vs the red target bot
-                if (b.position.distanceTo(bot.position) < 1.5) {
-                    bot.material.color.setHex(Math.random() * 0xffffff); // Bot flashes random color when hit
-                    scene.remove(b);
+                b.x += b.vx; b.y += b.vy; b.z += b.vz;
+
+                // Simple collision test tracking vs enemy bot box matrix bounds
+                const d = Math.hypot(b.x - bot.x, b.z - bot.z);
+                if (d < bot.size && Math.abs(b.y - bot.y) < 1.5) {
+                    bot.color = "#00f5d4"; // Flash green on weapon impact registration
+                    setTimeout(() => bot.color = "#ff4757", 150);
                     bullets.splice(i, 1);
                     continue;
                 }
-                
-                // Cleanup out of bounds projectiles
-                if (b.position.length() > 150) {
-                    scene.remove(b);
-                    bullets.splice(i, 1);
-                }
+                // Out of range wipe cleanup cycle 
+                if (Math.hypot(b.x - player.x, b.z - player.z) > 100) bullets.splice(i, 1);
             }
-
-            renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function renderScene() {
+            ctx.fillStyle = "#0c0c1e";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        animate();
+            // 1. Draw 3D Arena Floor Grid Matrix Accent System
+            ctx.strokeStyle = "#1b1b3a";
+            ctx.lineWidth = 1;
+            const gridSize = 40, spacing = 4;
+            for (let i = -gridSize; i <= gridSize; i += spacing) {
+                // Cross directional infinite alignment projection mappings lines
+                ctx.beginPath();
+                for (let z = -gridSize; z <= gridSize; z += 2) {
+                    const pt = project3DPoint(i, -1, z);
+                    if (pt) { if (z === -gridSize) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y); }
+                }
+                ctx.stroke();
+
+                ctx.beginPath();
+                for (let x = -gridSize; x <= gridSize; x += 2) {
+                    const pt = project3DPoint(x, -1, i);
+                    if (pt) { if (x === -gridSize) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y); }
+                }
+                ctx.stroke();
+            }
+
+            // 2. Draw Target Bot Box Structure
+            const botVerts = createCubeVertices(bot.x, 0.5, bot.z, bot.size, 2, bot.size);
+            draw3DObject(botVerts, bot.color, "#ffffff");
+
+            // 3. Draw User Placed Architecture Modular Walls Setup
+            walls.forEach(w => {
+                const wallVerts = createCubeVertices(w.x, w.y, w.z, w.sx, w.sy, w.sz);
+                draw3DObject(wallVerts, "#2a3dac", "#4d62e0");
+            });
+
+            // 4. Draw Blueprint Placement Outline if in Build Mode
+            if (activeSlot === 2) {
+                const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
+                const bx = Math.round((player.x - sY * 5) / 4) * 4;
+                const bz = Math.round((player.z - cY * 5) / 4) * 4;
+                const ghostVerts = createCubeVertices(bx, 0.5, bz, 4, 3, 0.5);
+                draw3DObject(ghostVerts, "rgba(0, 245, 212, 0.1)", "#00f5d4");
+            }
+
+            // 5. Render Flying Projectiles Particles Dots
+            bullets.forEach(b => {
+                const pt = project3DPoint(b.x, b.y, b.z);
+                if (pt) {
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, Math.max(2, 10 / pt.depth), 0, Math.PI * 2);
+                    ctx.fillStyle = "#00f5d4";
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            });
+
+            // 6. Center Pointer Reticle Overlay configuration target
+            ctx.strokeStyle = "#00f5d4";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2, 6, 0, Math.PI*2);
+            ctx.stroke();
+        }
+
+        function engineLoop() {
+            frameUpdate();
+            renderScene();
+            requestAnimationFrame(engineLoop);
+        }
+
+        // Kick off engine loops natively without blocking layers hooks
+        engineLoop();
     </script>
 </body>
 </html>
