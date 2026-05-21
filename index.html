@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Offline 3D 1v1 Arena Shooter</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #050512; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; user-select: none; }
         
         /* Advanced HUD Dashboard Overlay */
         #hud { position: absolute; top: 15px; left: 15px; background: rgba(10,10,25,0.92); padding: 15px 20px; border-radius: 8px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.5; font-size: 13px; z-index: 10; box-shadow: 0 0 15px rgba(0,245,212,0.2); }
@@ -396,11 +396,11 @@
         // --- Main Engine Graphics Rendering Loops ---
         function renderScene() {
             // Keep background deep canvas cleanly wiped every tick
-            ctx.fillStyle = "#090916";
+            ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // 1. Draw 3D Arena Ground Grid Matrix lines
-            ctx.strokeStyle = "#171730";
+            ctx.strokeStyle = "#e2e8f0";
             ctx.lineWidth = 1;
             const gridSize = 40, spacing = 4;
             for (let i = -gridSize; i <= gridSize; i += spacing) {
