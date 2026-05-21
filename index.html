@@ -3,42 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fixed 1v1 3D Offline Arena</title>
+    <title>Ultimate Offline 3D 1v1 Arena Shooter</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #060610; font-family: sans-serif; color: white; user-select: none; }
-        #hud { position: absolute; top: 15px; left: 15px; background: rgba(15,15,30,0.9); padding: 15px; border-radius: 6px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.4; font-size: 13px; z-index: 10; }
-        #hotbar { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10; }
-        .slot { width: 75px; height: 60px; background: rgba(20,20,40,0.9); border: 2px solid #444; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #888; }
-        .slot.active { border-color: #00f5d4; color: #fff; background: rgba(0,245,212,0.15); }
+        body { margin: 0; overflow: hidden; background: #050512; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; user-select: none; }
         
-        /* Mobile/Mouse backup click controls layout */
-        #touch-controls { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 100; }
-        .btn { background: #1e1e38; border: 2px solid #00f5d4; color: white; padding: 12px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .btn:active { background: #00f5d4; color: black; }
+        /* Advanced HUD Dashboard Overlay */
+        #hud { position: absolute; top: 15px; left: 15px; background: rgba(10,10,25,0.92); padding: 15px 20px; border-radius: 8px; border: 2px solid #00f5d4; pointer-events: none; line-height: 1.5; font-size: 13px; z-index: 10; box-shadow: 0 0 15px rgba(0,245,212,0.2); }
+        .hud-title { margin: 0 0 6px 0; color: #00f5d4; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-line { font-weight: bold; font-size: 14px; margin-top: 5px; }
+        
+        /* Interactive Live Hotbar */
+        #hotbar { position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 10; }
+        .slot { width: 85px; height: 65px; background: rgba(15,15,35,0.9); border: 2px solid #3d3d5c; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #7575a3; transition: all 0.15s ease; }
+        .slot.active { border-color: #00f5d4; color: #fff; background: rgba(0,245,212,0.2); box-shadow: 0 0 12px rgba(0,245,212,0.3); transform: scale(1.05); }
+        
+        /* Action Command Core Bar Buttons */
+        #control-deck { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 100; }
+        .btn { background: #13132b; border: 2px solid #00f5d4; color: white; padding: 14px 22px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.1s ease; }
+        .btn:active { background: #00f5d4; color: black; transform: translateY(2px); }
+        .btn-danger { border-color: #ff4757; }
+        .btn-danger:active { background: #ff4757; color: white; }
+        
+        /* Health Meter Configurations */
+        .meter-container { display: inline-block; width: 100px; height: 12px; background: #222; border-radius: 3px; border: 1px solid #444; vertical-align: middle; overflow: hidden; margin-left: 5px; }
+        .meter-fill { height: 100%; width: 100%; transition: width 0.1s ease; }
+        #player-hp { background: #ff4757; }
+        #bot-hp { background: #ff4757; }
     </style>
 </head>
 <body>
 
+    <!-- HUD Real-time Metrics Dashboard -->
     <div id="hud">
-        <h3 style="margin:0 0 6px 0; color:#00f5d4;">Universal 3D Engine</h3>
+        <h3 class="hud-title">Custom 3D Engine Sandbox</h3>
         <b>[W, A, S, D]</b> Walk Around<br>
-        <b>[Left / Right Arrow]</b> Spin Camera<br>
-        <b>[Up / Down Arrow]</b> Tilt View Angle<br>
-        <b>[1]</b> Gun Mode &nbsp;|&nbsp; <b>[2]</b> Wall Mode<br>
-        <b>[SPACEBAR]</b> Fire Gun / Build Structure
+        <b>[Arrows Left / Right]</b> Spin Camera<br>
+        <b>[Arrows Up / Down]</b> Tilt Sight Line<br>
+        <b>[1]</b> Gun Mode &nbsp;|&nbsp; <b>[2]</b> Wall Mode &nbsp;|&nbsp; <b>[3]</b> Ramp Mode<br>
+        <b>[SPACEBAR]</b> Perform Active Action
+        <div style="border-top: 1px solid #333; margin: 8px 0;"></div>
+        <div class="stat-line">PLAYER HEALTH: <div class="meter-container"><div id="player-hp" class="meter-fill"></div></div></div>
+        <div class="stat-line">BOT HEALTH: <div class="meter-container"><div id="bot-hp" class="meter-fill"></div></div></div>
+        <div class="stat-line" style="color: #ecc94b; margin-top: 4px;">SCORE: <span id="score-val">0</span></div>
     </div>
 
+    <!-- Active Hotbar Equipment Slots -->
     <div id="hotbar">
         <div class="slot active" id="slot-1"><span>🔫</span><br>GUN (1)</div>
         <div class="slot" id="slot-2"><span>🧱</span><br>WALL (2)</div>
+        <div class="slot" id="slot-3"><span>📐</span><br>RAMP (3)</div>
     </div>
 
-    <!-- Backup Controls Box: Left-Clicking these works instantly if your keyboard focus drops out -->
-    <div id="touch-controls">
-        <button class="btn" onmousedown="keys['w']=true" onmouseup="keys['w']=false" onmouseleave="keys['w']=false">FORWARDS (W)</button>
-        <button class="btn" onmousedown="keys['arrowleft']=true" onmouseup="keys['arrowleft']=false" onmouseleave="keys['arrowleft']=false">TURN LEFT (←)</button>
-        <button class="btn" onmousedown="keys['arrowright']=true" onmouseup="keys['arrowright']=false" onmouseleave="keys['arrowright']=false">TURN RIGHT (→)</button>
-        <button class="btn" onclick="executeAction()">FIRE / BUILD (SPACE)</button>
+    <!-- Interface Button Deck Platform Controls -->
+    <div id="control-deck">
+        <button class="btn" onmousedown="keys['w']=true" onmouseup="keys['w']=false" onmouseleave="keys['w']=false">FORWARD (W)</button>
+        <button class="btn" onmousedown="keys['s']=true" onmouseup="keys['s']=false" onmouseleave="keys['s']=false">BACK (S)</button>
+        <button class="btn" onmousedown="keys['arrowleft']=true" onmouseup="keys['arrowleft']=false" onmouseleave="keys['arrowleft']=false">LOOK ←</button>
+        <button class="btn" onmousedown="keys['arrowright']=true" onmouseup="keys['arrowright']=false" onmouseleave="keys['arrowright']=false">LOOK →</button>
+        <button class="btn" onclick="executeAction()">ACTION (SPACE)</button>
+        <button class="btn btn-danger" onclick="clearStructures()">RESET ARENA</button>
     </div>
 
     <canvas id="renderCanvas"></canvas>
@@ -54,39 +77,55 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Core Application Engine Matrices ---
-        let activeSlot = 1;
+        // --- Core Application State Matrices ---
+        let activeSlot = 1; // 1: Gun, 2: Wall, 3: Ramp
+        let playerScore = 0;
         const keys = { w: false, s: false, a: false, d: false, arrowleft: false, arrowright: false, arrowup: false, arrowdown: false };
         
-        const player = { x: 0, y: 0, z: 10, yaw: 0, pitch: 0 };
-        const bot = { x: 0, y: 0, z: -15, size: 1.5, color: "#ff4757", dir: 1 };
+        const player = { x: 0, y: 0, z: 12, yaw: 0, pitch: 0, hp: 100 };
+        const bot = { x: 0, y: 0, z: -12, size: 2.0, color: "#ff4757", hp: 100, lastShot: 0, shootInterval: 1200, state: "patrol", dirX: 1, targetX: 0, targetZ: 0 };
         
-        const walls = [];
-        const bullets = [];
-        
-        function createCubeVertices(cx, cy, cz, sx, sy, sz) {
+        const structures = []; // Stores walls and ramps architecture objects
+        const bullets = [];    // Live ballistics physics items
+        const particles = [];  // Spark flash systems explosion items
+
+        // Fixed mathematical index matrices mapping out 3D face volumes cleanly
+        const cubeFaces = [
+            [0, 1, 2, 3], // Front
+            [4, 5, 6, 7], // Back
+            [0, 1, 5, 4], // Bottom
+            [2, 3, 7, 6], // Top
+            [0, 3, 7, 4], // Left
+            [1, 2, 6, 5]  // Right
+        ];
+
+        // --- Dynamic 3D Structural Mesh Factory ---
+        function createVertices(cx, cy, cz, sx, sy, sz, type = "flat") {
             const hx = sx/2, hy = sy/2, hz = sz/2;
-            return [
+            let verts = [
                 {x: cx-hx, y: cy-hy, z: cz-hz}, {x: cx+hx, y: cy-hy, z: cz-hz},
                 {x: cx+hx, y: cy+hy, z: cz-hz}, {x: cx-hx, y: cy+hy, z: cz-hz},
                 {x: cx-hx, y: cy-hy, z: cz+hz}, {x: cx+hx, y: cy-hy, z: cz+hz},
                 {x: cx+hx, y: cy+hy, z: cz+hz}, {x: cx-hx, y: cy+hy, z: cz+hz}
             ];
+
+            // Algorithmic Vertex Shear Displacement to output functional 3D Ramps
+            if (type === "ramp") {
+                // Elevate top-front vertices and collapse bottom-back vertices to forge an inclined plane slope
+                verts[2].y += 3.0; verts[3].y += 3.0;
+                verts[6].y -= 0.2; verts[7].y -= 0.2;
+            }
+            return verts;
         }
 
-        const cubeFaces = [
-            [0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4],
-            [2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5]
-        ];
-
-        // --- Standardized Key String Parsing Pipeline ---
+        // --- Standardized Global Inputs Parsing Platform ---
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
             if (k === ' ' || e.code === 'Space') { executeAction(); return; }
-            if (k === '1') { activeSlot = 1; updateSlots(); return; }
-            if (k === '2') { activeSlot = 2; updateSlots(); return; }
+            if (k === '1') { switchSlot(1); return; }
+            if (k === '2') { switchSlot(2); return; }
+            if (k === '3') { switchSlot(3); return; }
             
-            // Standard tracking mapping checks
             if (k === 'w') keys['w'] = true;
             if (k === 's') keys['s'] = true;
             if (k === 'a') keys['a'] = true;
@@ -109,34 +148,61 @@
             if (e.key === 'ArrowDown') keys['arrowdown'] = false;
         });
 
-        function updateSlots() {
-            document.getElementById('slot-1').className = activeSlot === 1 ? 'slot active' : 'slot';
-            document.getElementById('slot-2').className = activeSlot === 2 ? 'slot active' : 'slot';
+        function switchSlot(num) {
+            activeSlot = num;
+            document.querySelectorAll('.slot').forEach((s, idx) => {
+                s.className = (idx + 1 === num) ? 'slot active' : 'slot';
+            });
         }
 
         function executeAction() {
+            if (player.hp <= 0) return;
             const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
+            const sP = Math.sin(player.pitch), cP = Math.cos(player.pitch);
+            
             if (activeSlot === 1) {
-                // Spawn Projectile
+                // Shoot Projectile Ballistics Vector mapping out player look angles
                 bullets.push({
                     x: player.x, y: 0.5, z: player.z,
-                    vx: -sY * 0.8, vy: Math.sin(player.pitch) * 0.8, vz: -cY * 0.8
+                    vx: -sY * cP * 0.75, vy: sP * 0.75, vz: -cY * cP * 0.75,
+                    owner: "player"
                 });
-            } else if (activeSlot === 2) {
-                // Snap Build Structure node
+            } else {
+                // Snap structure architecture nodes cleanly into uniform grid squares
                 const bx = Math.round((player.x - sY * 5) / 4) * 4;
                 const bz = Math.round((player.z - cY * 5) / 4) * 4;
-                if (!walls.some(w => w.x === bx && w.z === bz)) {
-                    walls.push({ x: bx, y: 0.5, z: bz, sx: 4, sy: 3, sz: 0.5 });
+                const type = (activeSlot === 2) ? "wall" : "ramp";
+                
+                if (!structures.some(s => s.x === bx && s.z === bz)) {
+                    structures.push({ x: bx, y: 0.5, z: bz, sx: 4, sy: 3, sz: 0.8, type: type });
                 }
             }
         }
 
-        // --- Graphics Engine Ray Matrices Perspective Transformation ---
+        function clearStructures() {
+            structures.length = 0;
+        }
+
+        function triggerExplosion(tx, ty, tz, baseColor) {
+            // Instantiate bright volumetric spark particle counts expanding outward randomly
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: tx, y: ty, z: tz,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    vz: (Math.random() - 0.5) * 0.4,
+                    life: 1.0,
+                    decay: 0.04 + Math.random() * 0.03,
+                    color: baseColor
+                });
+            }
+        }
+
+        // --- Mathematics Perspective Projection Engine ---
         function project3DPoint(worldX, worldY, worldZ) {
             const sY = Math.sin(-player.yaw), cY = Math.cos(-player.yaw);
-            const camDistance = 6;
-            const camHeight = 2.5;
+            const camDistance = 6.5;
+            const camHeight = 2.2;
 
             let rx = player.x - sY * camDistance;
             let rz = player.z + cY * camDistance;
@@ -155,7 +221,7 @@
 
             if (z2 <= 0.1) return null;
 
-            const fovFactor = (canvas.width + canvas.height) / 2;
+            const fovFactor = (canvas.width + canvas.height) / 2 * 0.85;
             const screenX = (x1 / z2) * fovFactor + canvas.width / 2;
             const screenY = (-y2 / z2) * fovFactor + canvas.height / 2;
 
@@ -176,20 +242,72 @@
                     ctx.closePath();
                     ctx.fillStyle = color;
                     ctx.fill();
-                    ctx.strokeStyle = outlineColor || "rgba(255,255,255,0.2)";
-                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = outlineColor || "rgba(255,255,255,0.15)";
+                    ctx.lineWidth = 1.5;
                     ctx.stroke();
                 }
             });
         }
 
-        // --- Core State Logic Loops ---
+        // --- Combat AI Threat Automation Pipeline ---
+        function handleBotAI() {
+            if (bot.hp <= 0 || player.hp <= 0) return;
+
+            // Compute distance matrix tracking player location vectors
+            const dx = player.x - bot.x;
+            const dz = player.z - bot.z;
+            const dist = Math.hypot(dx, dz);
+
+            // Turn bot toward player
+            const targetAngle = Math.atan2(dx, dz);
+
+            // Active State Behavior Tree choices
+            if (dist > 18) {
+                // Tactical Approach patterns closer to user target bounds
+                bot.x += Math.sin(targetAngle) * 0.06;
+                bot.z += Math.cos(targetAngle) * 0.06;
+            } else if (dist < 8) {
+                // Strafe retreat patterns if user steps up too close
+                bot.x -= Math.sin(targetAngle) * 0.06;
+                bot.z -= Math.cos(targetAngle) * 0.06;
+            } else {
+                // Side-to-side strafe evasion maneuver choices
+                bot.x += Math.cos(targetAngle) * 0.05 * bot.dirX;
+                if (Math.random() < 0.02) bot.dirX *= -1; // Randomly flip evasion course directions
+            }
+
+            // High Ground Adaptive Building: if the bot is locked into target fire, drop defenses
+            if (Math.random() < 0.003 && structures.length < 25) {
+                const bx = Math.round((bot.x + Math.sin(targetAngle) * 4) / 4) * 4;
+                const bz = Math.round((bot.z + Math.cos(targetAngle) * 4) / 4) * 4;
+                if (!structures.some(s => s.x === bx && s.z === bz)) {
+                    structures.push({ x: bx, y: 0.5, z: bz, sx: 4, sy: 3, sz: 0.8, type: Math.random() > 0.5 ? "wall" : "ramp" });
+                }
+            }
+
+            // Weapon Systems Automation Schedule Fire Loops
+            const now = Date.now();
+            if (now - bot.lastShot > bot.shootInterval) {
+                // Fire weapon trajectory accurately mapped straight targeting player center positions coordinates
+                const shootAngle = Math.atan2(player.x - bot.x, player.z - bot.z);
+                bullets.push({
+                    x: bot.x, y: 0.5, z: bot.z,
+                    vx: Math.sin(shootAngle) * 0.5, vy: ((player.y + 0.5) - 0.5) / dist * 0.5, vz: Math.cos(shootAngle) * 0.5,
+                    owner: "bot"
+                });
+                bot.lastShot = now;
+            }
+        }
+
+        // --- Core Application Engine Frame Update Loops ---
         function frameUpdate() {
+            // Handle Look Input Maps parsing
             if (keys['arrowleft']) player.yaw += 0.04;
             if (keys['arrowright']) player.yaw -= 0.04;
             if (keys['arrowup']) player.pitch = Math.min(0.5, player.pitch + 0.03);
             if (keys['arrowdown']) player.pitch = Math.max(-0.5, player.pitch - 0.03);
 
+            // Handle Movement Input Maps parsing
             const speed = 0.15;
             const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
             if (keys['w']) { player.x -= sin * speed; player.z -= cos * speed; }
@@ -197,29 +315,92 @@
             if (keys['a']) { player.x -= cos * speed; player.z += sin * speed; }
             if (keys['d']) { player.x += cos * speed; player.z -= sin * speed; }
 
-            bot.x += 0.06 * bot.dir;
-            if (Math.abs(bot.x) > 12) bot.dir *= -1;
+            // Update Combat AI
+            handleBotAI();
 
+            // Update Spark Particles Decays and motions
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.z += p.vz;
+                p.life -= p.decay;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Update Weapon Ballistics Trajectories and Collision Interfaces
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
                 b.x += b.vx; b.y += b.vy; b.z += b.vz;
-                const d = Math.hypot(b.x - bot.x, b.z - bot.z);
-                if (d < bot.size && Math.abs(b.y - bot.y) < 1.5) {
-                    bot.color = "#00f5d4";
-                    setTimeout(() => bot.color = "#ff4757", 150);
-                    bullets.splice(i, 1);
-                    continue;
+
+                let bulletRemoved = false;
+
+                // 1. Structural Obstacle Impact Collision check loops
+                for (let j = structures.length - 1; j >= 0; j--) {
+                    let s = structures[j];
+                    const distToStructure = Math.hypot(b.x - s.x, b.z - s.z);
+                    if (distToStructure < 2.2 && Math.abs(b.y - s.y) < 1.6) {
+                        triggerExplosion(b.x, b.y, b.z, "#4d62e0");
+                        structures.splice(j, 1); // Break architecture module block down completely on hit
+                        bullets.splice(i, 1);
+                        bulletRemoved = true;
+                        break;
+                    }
                 }
-                if (Math.hypot(b.x - player.x, b.z - player.z) > 100) bullets.splice(i, 1);
+                if (bulletRemoved) continue;
+
+                // 2. Damage Tracking Matrix verification mappings vs Entities targets 
+                if (b.owner === "player") {
+                    const distToBot = Math.hypot(b.x - bot.x, b.z - bot.z);
+                    if (distToBot < (bot.size / 2 + 0.2) && Math.abs(b.y - 0.5) < 1.2) {
+                        triggerExplosion(b.x, b.y, b.z, "#00f5d4"); // Flash bright cyan burst sparks sparks
+                        bot.hp -= 20;
+                        bot.color = "#00f5d4"; // Flash hit color highlight
+                        setTimeout(() => bot.color = "#ff4757", 120);
+                        
+                        if (bot.hp <= 0) {
+                            playerScore++;
+                            // Instant layout reset respawn loops positions matrices 
+                            bot.hp = 100;
+                            bot.x = (Math.random() - 0.5) * 15;
+                            bot.z = -15 - Math.random() * 5;
+                        }
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+                } else if (b.owner === "bot") {
+                    const distToPlayer = Math.hypot(b.x - player.x, b.z - player.z);
+                    if (distToPlayer < 1.2 && Math.abs(b.y - 0.5) < 1.5) {
+                        triggerExplosion(b.x, b.y, b.z, "#ff4757"); // Flash crimson burst sparks damage indicators
+                        player.hp = Math.max(0, player.hp - 15);
+                        
+                        if (player.hp <= 0) {
+                            // Automatically reload spawn position on complete system failure
+                            setTimeout(() => { player.hp = 100; player.x = 0; player.z = 12; }, 1500);
+                        }
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // Cull stray out of range projectile limits
+                if (Math.hypot(b.x - player.x, b.z - player.z) > 75) {
+                    bullets.splice(i, 1);
+                }
             }
+
+            // Synchronize HUD panels data values
+            document.getElementById("player-hp").style.width = `${player.hp}%`;
+            document.getElementById("bot-hp").style.width = `${bot.hp}%`;
+            document.getElementById("score-val").innerText = playerScore;
         }
 
+        // --- Main Engine Graphics Rendering Loops ---
         function renderScene() {
-            ctx.fillStyle = "#0c0c1e";
+            // Keep background deep canvas cleanly wiped every tick
+            ctx.fillStyle = "#090916";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Floor rendering parameters
-            ctx.strokeStyle = "#1b1b3a";
+            // 1. Draw 3D Arena Ground Grid Matrix lines
+            ctx.strokeStyle = "#171730";
             ctx.lineWidth = 1;
             const gridSize = 40, spacing = 4;
             for (let i = -gridSize; i <= gridSize; i += spacing) {
@@ -238,33 +419,72 @@
                 ctx.stroke();
             }
 
-            // Draw Entities
-            draw3DObject(createCubeVertices(bot.x, 0.5, bot.z, bot.size, 2, bot.size), bot.color, "#ffffff");
-            walls.forEach(w => draw3DObject(createCubeVertices(w.x, w.y, w.z, w.sx, w.sy, w.sz), "#2a3dac", "#4d62e0"));
+            // 2. Render Defensive Architecture Objects structures
+            structures.forEach(s => {
+                const wallVerts = createVertices(s.x, s.y, s.z, s.sx, s.sy, s.sz, s.type);
+                const baseColor = (s.type === "wall") ? "#2a3dac" : "#593cad";
+                const lineHighlight = (s.type === "wall") ? "#4d62e0" : "#7d5ce0";
+                draw3DObject(wallVerts, baseColor, lineHighlight);
+            });
 
-            if (activeSlot === 2) {
+            // 3. Render Threat Bot Character cube volume mesh
+            if (bot.hp > 0) {
+                draw3DObject(createCubeVertices(bot.x, 0.5, bot.z, bot.size, 2, bot.size), bot.color, "#ffffff");
+            }
+
+            // 4. Render Active Build Snapshot Ghost Blueprints box preview
+            if (activeSlot > 1 && player.hp > 0) {
                 const sY = Math.sin(player.yaw), cY = Math.cos(player.yaw);
                 const bx = Math.round((player.x - sY * 5) / 4) * 4;
                 const bz = Math.round((player.z - cY * 5) / 4) * 4;
-                draw3DObject(createCubeVertices(bx, 0.5, bz, 4, 3, 0.5), "rgba(0, 245, 212, 0.1)", "#00f5d4");
+                const activeType = (activeSlot === 2) ? "flat" : "ramp";
+                
+                const ghostVerts = createVertices(bx, 0.5, bz, 4, 3, 0.8, activeType);
+                draw3DObject(ghostVerts, "rgba(0, 245, 212, 0.08)", "#00f5d4");
             }
 
+            // 5. Draw Flight Projectiles vectors particles loops
             bullets.forEach(b => {
                 const pt = project3DPoint(b.x, b.y, b.z);
                 if (pt) {
                     ctx.beginPath();
-                    ctx.arc(pt.x, pt.y, Math.max(2, 10 / pt.depth), 0, Math.PI * 2);
-                    ctx.fillStyle = "#00f5d4";
+                    ctx.arc(pt.x, pt.y, Math.max(3, 12 / pt.depth), 0, Math.PI * 2);
+                    ctx.fillStyle = (b.owner === "player") ? "#00f5d4" : "#ff4757";
                     ctx.fill();
+                    ctx.closePath();
                 }
             });
 
-            // Reticle Frame Highlight Target
-            ctx.strokeStyle = "#00f5d4";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(canvas.width/2, canvas.height/2, 6, 0, Math.PI*2);
-            ctx.stroke();
+            // 6. Draw Volumetric Spark Particles items explosions
+            particles.forEach(p => {
+                const pt = project3DPoint(p.x, p.y, p.z);
+                if (pt) {
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, Math.max(1, 6 / pt.depth), 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            });
+            ctx.globalAlpha = 1.0; // Reset canvas transparency buffer mapping settings
+
+            // 7. Reticle Crosshair center tracking screen overlay
+            if (player.hp > 0) {
+                ctx.strokeStyle = "#00f5d4";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, 6, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                // Game Over Screen Cover Overlay Panel Masks updates
+                ctx.fillStyle = "rgba(240, 71, 87, 0.15)";
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.font = "bold 30px sans-serif";
+                ctx.fillStyle = "#ff4757";
+                ctx.textAlign = "center";
+                ctx.fillText("ELIMINATED - RESPAWNING...", canvas.width/2, canvas.height/2);
+            }
         }
 
         function engineLoop() {
@@ -273,6 +493,7 @@
             requestAnimationFrame(engineLoop);
         }
 
+        // Start engine execution cycle
         engineLoop();
     </script>
 </body>
